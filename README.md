@@ -175,6 +175,30 @@ bash scripts/docker-down.sh
 docker compose down
 ```
 
+从 Git 拉取最新代码并重建容器：
+
+```bash
+bash scripts/docker-update.sh
+```
+
+也可以直接在仓库根目录执行：
+
+```bash
+bash update.sh
+```
+
+如需指定分支，可在脚本后传入分支名：
+
+```bash
+bash scripts/docker-update.sh main
+```
+
+或：
+
+```bash
+bash update.sh main
+```
+
 ### 5) 数据说明
 
 - 容器内数据库路径固定为 `/app/data/sampler-salary.sqlite`
@@ -187,6 +211,18 @@ docker compose down
 
 ```bash
 docker compose up -d --build
+```
+
+如果希望将“拉代码 + 停容器 + 重建启动”合并为一个命令，推荐直接执行：
+
+```bash
+bash scripts/docker-update.sh
+```
+
+如果你习惯在项目根目录下操作，也可以使用：
+
+```bash
+bash update.sh
 ```
 
 ## Windows + PM2 部署
