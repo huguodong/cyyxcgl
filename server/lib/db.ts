@@ -63,21 +63,18 @@ function seedDefaultAdmin() {
 }
 
 function seedSalaryConfigs() {
-  const existingConfigCount = db.prepare('SELECT COUNT(1) AS count FROM salary_configs WHERE is_deleted = ?').get('n') as { count: number };
-  if (existingConfigCount.count > 0) {
-    return;
-  }
-
   const timestamp = now();
   const seedConfigs: Array<[string, string, number, string]> = [
-    ['salary', 'piece_rate_base', 50, '每个样本的基础计件工资'],
-    ['salary', 'hourly_rate', 30, '正常工时每小时工资'],
-    ['salary', 'overtime_multiplier', 1.5, '工作日加班工资倍数'],
-    ['salary', 'weekend_multiplier', 2, '周末工时工资倍数'],
-    ['salary', 'holiday_multiplier', 3, '节假日工时工资倍数'],
-    ['salary', 'performance_ratio', 10, '绩效奖金占基础工资比例'],
-    ['salary', 'tax_rate', 0, '税率，当前不参与计算'],
-    ['salary', 'social_security_ratio', 0, '社保比例，当前不参与计算'],
+    ['salary', 'basic_salary_standard', 2100, '制度基本工资标准；适用地最低工资更高时按更高标准执行'],
+    ['salary', 'local_minimum_wage', 2100, '适用地现行最低工资标准'],
+    ['salary', 'performance_pool_ratio', 10, '小组绩效工资池提取比例，即小组有效业绩的 10%'],
+    ['salary', 'equal_share_ratio', 70, '绩效工资池均分比例'],
+    ['salary', 'differential_share_ratio', 30, '绩效工资池按工作量差异分配比例'],
+    ['salary', 'default_required_attendance_days', 22, '默认月度应出勤天数'],
+    ['position', 'position_salary_level_1', 200, '一级岗位工资'],
+    ['position', 'position_salary_level_2', 400, '二级岗位工资'],
+    ['position', 'position_salary_level_3', 800, '三级岗位工资'],
+    ['position', 'position_salary_level_4', 1600, '四级岗位工资'],
   ];
 
   const insertStatement = db.prepare(`
@@ -99,6 +96,16 @@ function seedSalaryConfigs() {
 
   const insertMany = db.transaction((configs: Array<[string, string, number, string]>) => {
     configs.forEach(([configType, configKey, configValue, description]) => {
+      const existing = db.prepare(`
+        SELECT id
+        FROM salary_configs
+        WHERE corp_id = ? AND config_key = ? AND is_deleted = 'n'
+      `).get(ENV.corpId, configKey) as { id: number } | undefined;
+
+      if (existing) {
+        return;
+      }
+
       insertStatement.run(
         ENV.corpId,
         ENV.appId,
@@ -117,6 +124,33 @@ function seedSalaryConfigs() {
   });
 
   insertMany(seedConfigs);
+}
+
+function retireLegacySalaryConfigs() {
+  const legacyKeys = [
+    'piece_rate_base',
+    'hourly_rate',
+    'overtime_multiplier',
+    'weekend_multiplier',
+    'holiday_multiplier',
+    'performance_ratio',
+    'tax_rate',
+    'social_security_ratio',
+  ];
+
+  const placeholders = legacyKeys.map(() => '?').join(', ');
+  db.prepare(`
+    UPDATE salary_configs
+    SET is_deleted = 'y', is_active = 0, updated_at = ?
+    WHERE config_key IN (${placeholders}) AND is_deleted = 'n'
+  `).run(now(), ...legacyKeys);
+}
+
+function ensureColumn(tableName: string, columnName: string, definition: string) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
 }
 
 export function initDatabase() {
@@ -147,8 +181,7 @@ export function initDatabase() {
       phone TEXT,
       entry_date TEXT,
       status TEXT NOT NULL DEFAULT 'active',
-      base_salary REAL NOT NULL DEFAULT 0,
-      skill_level TEXT,
+      job_level INTEGER NOT NULL DEFAULT 1,
       is_deleted TEXT NOT NULL DEFAULT 'n',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -202,12 +235,27 @@ export function initDatabase() {
       emp_id TEXT NOT NULL,
       sampler_id INTEGER,
       year_month TEXT NOT NULL,
-      base_salary REAL NOT NULL DEFAULT 0,
-      piece_rate_salary REAL NOT NULL DEFAULT 0,
-      hourly_salary REAL NOT NULL DEFAULT 0,
-      overtime_pay REAL NOT NULL DEFAULT 0,
-      performance_bonus REAL NOT NULL DEFAULT 0,
-      deductions REAL NOT NULL DEFAULT 0,
+      basic_salary REAL NOT NULL DEFAULT 0,
+      position_salary REAL NOT NULL DEFAULT 0,
+      group_revenue REAL NOT NULL DEFAULT 0,
+      performance_pool REAL NOT NULL DEFAULT 0,
+      equal_performance REAL NOT NULL DEFAULT 0,
+      differential_performance REAL NOT NULL DEFAULT 0,
+      workload_points REAL NOT NULL DEFAULT 0,
+      group_workload_points REAL NOT NULL DEFAULT 0,
+      workload_share REAL NOT NULL DEFAULT 0,
+      attendance_days REAL NOT NULL DEFAULT 0,
+      required_attendance_days REAL NOT NULL DEFAULT 0,
+      attendance_rate REAL NOT NULL DEFAULT 1,
+      quality_score REAL NOT NULL DEFAULT 100,
+      timeliness_score REAL NOT NULL DEFAULT 100,
+      equipment_score REAL NOT NULL DEFAULT 100,
+      comprehensive_score REAL NOT NULL DEFAULT 100,
+      comprehensive_coefficient REAL NOT NULL DEFAULT 1,
+      performance_salary REAL NOT NULL DEFAULT 0,
+      other_pay REAL NOT NULL DEFAULT 0,
+      veto INTEGER NOT NULL DEFAULT 0,
+      veto_reason TEXT,
       total_salary REAL NOT NULL DEFAULT 0,
       actual_salary REAL NOT NULL DEFAULT 0,
       payment_status TEXT NOT NULL DEFAULT 'unpaid',
@@ -236,8 +284,32 @@ export function initDatabase() {
     );
   `);
 
+  ensureColumn('samplers', 'job_level', 'INTEGER NOT NULL DEFAULT 1');
+  ensureColumn('salary_records', 'basic_salary', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'position_salary', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'group_revenue', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'performance_pool', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'equal_performance', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'differential_performance', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'workload_points', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'group_workload_points', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'workload_share', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'attendance_days', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'required_attendance_days', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'attendance_rate', 'REAL NOT NULL DEFAULT 1');
+  ensureColumn('salary_records', 'quality_score', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'timeliness_score', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'equipment_score', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'comprehensive_score', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'comprehensive_coefficient', 'REAL NOT NULL DEFAULT 1');
+  ensureColumn('salary_records', 'performance_salary', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'other_pay', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'veto', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'veto_reason', 'TEXT');
+
   seedDefaultAdmin();
   seedSalaryConfigs();
+  retireLegacySalaryConfigs();
 }
 
 export function getCurrentTimestamp(): string {

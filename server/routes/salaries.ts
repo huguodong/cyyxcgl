@@ -16,6 +16,25 @@ function getConfigMap(corpId: string): Record<string, number> {
   }, {});
 }
 
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getComprehensiveCoefficient(score: number, veto: boolean): number {
+  if (veto) return 0;
+  if (score >= 100) return 1.05;
+  if (score >= 95) return 1;
+  if (score >= 90) return 0.95;
+  if (score >= 85) return 0.9;
+  if (score >= 80) return 0.8;
+  return 0.6;
+}
+
 router.get('/', (req: any, res) => {
   try {
     const data = db.prepare(`
@@ -72,44 +91,37 @@ router.post('/calculate', (req: any, res) => {
     }
 
     const configMap = getConfigMap(req.user.corp_id);
-    const pieceRateBase = configMap.piece_rate_base ?? 50;
-    const hourlyRate = configMap.hourly_rate ?? 30;
-    const overtimeMultiplier = configMap.overtime_multiplier ?? 1.5;
-    const weekendMultiplier = configMap.weekend_multiplier ?? 2;
-    const holidayMultiplier = configMap.holiday_multiplier ?? 3;
-    const performanceRatio = (configMap.performance_ratio ?? 10) / 100;
+    const basicSalaryStandard = configMap.basic_salary_standard ?? 2100;
+    const localMinimumWage = configMap.local_minimum_wage ?? 2100;
+    const performancePoolRatio = (configMap.performance_pool_ratio ?? 10) / 100;
+    const equalShareRatio = (configMap.equal_share_ratio ?? 70) / 100;
+    const differentialShareRatio = (configMap.differential_share_ratio ?? 30) / 100;
+    const defaultRequiredAttendanceDays = configMap.default_required_attendance_days ?? 22;
+    const jobLevel = Number.parseInt(sampler.job_level, 10) || 1;
+    const positionSalary = configMap[`position_salary_level_${jobLevel}`] ?? ({ 1: 200, 2: 400, 3: 800, 4: 1600 }[jobLevel] || 0);
 
-    const tasks = db.prepare(`
-      SELECT *
-      FROM sampling_tasks
-      WHERE corp_id = ? AND sampler_id = ? AND status = 'completed' AND is_deleted = 'n'
-        AND substr(COALESCE(start_time, created_at), 1, 7) = ?
-    `).all(req.user.corp_id, samplerId, yearMonth) as any[];
+    const groupRevenue = toNumber(req.body.group_revenue);
+    const distributionCount = Math.max(Number.parseInt(req.body.distribution_count, 10) || 1, 1);
+    const workloadPoints = toNumber(req.body.workload_points);
+    const groupWorkloadPoints = toNumber(req.body.group_workload_points);
+    const attendanceDays = toNumber(req.body.attendance_days, defaultRequiredAttendanceDays);
+    const requiredAttendanceDays = toNumber(req.body.required_attendance_days, defaultRequiredAttendanceDays);
+    const qualityScore = clamp(toNumber(req.body.quality_score, 100), 0, 100);
+    const timelinessScore = clamp(toNumber(req.body.timeliness_score, 100), 0, 100);
+    const equipmentScore = clamp(toNumber(req.body.equipment_score, 100), 0, 100);
+    const otherPay = toNumber(req.body.other_pay);
+    const veto = Boolean(req.body.veto);
 
-    const workHours = db.prepare(`
-      SELECT *
-      FROM work_hours
-      WHERE corp_id = ? AND sampler_id = ? AND is_approved = 1 AND is_deleted = 'n'
-        AND substr(work_date, 1, 7) = ?
-    `).all(req.user.corp_id, samplerId, yearMonth) as any[];
-
-    const pieceRateSalary = tasks.reduce((sum, task) => {
-      return sum + pieceRateBase * (task.sample_count || 0) * (task.difficulty_level || 1);
-    }, 0);
-
-    let hourlySalary = 0;
-    let overtimePay = 0;
-    workHours.forEach((workHour) => {
-      hourlySalary += (Number.parseFloat(workHour.regular_hours) || 0) * hourlyRate;
-      hourlySalary += (Number.parseFloat(workHour.weekend_hours) || 0) * hourlyRate * weekendMultiplier;
-      hourlySalary += (Number.parseFloat(workHour.holiday_hours) || 0) * hourlyRate * holidayMultiplier;
-      overtimePay += (Number.parseFloat(workHour.overtime_hours) || 0) * hourlyRate * overtimeMultiplier;
-    });
-
-    const baseSalary = Number.parseFloat(sampler.base_salary) || 0;
-    const performanceBonus = baseSalary * performanceRatio;
-    const deductions = 0;
-    const totalSalary = baseSalary + pieceRateSalary + hourlySalary + overtimePay + performanceBonus - deductions;
+    const basicSalary = Math.max(basicSalaryStandard, localMinimumWage);
+    const performancePool = groupRevenue * performancePoolRatio;
+    const equalPerformance = performancePool * equalShareRatio / distributionCount;
+    const workloadShare = groupWorkloadPoints > 0 ? workloadPoints / groupWorkloadPoints : 0;
+    const differentialPerformance = performancePool * differentialShareRatio * workloadShare;
+    const attendanceRate = requiredAttendanceDays > 0 ? clamp(attendanceDays / requiredAttendanceDays, 0, 1) : 1;
+    const comprehensiveScore = Number((qualityScore * 0.5 + timelinessScore * 0.4 + equipmentScore * 0.1).toFixed(2));
+    const comprehensiveCoefficient = getComprehensiveCoefficient(comprehensiveScore, veto);
+    const performanceSalary = Number(((equalPerformance + differentialPerformance) * comprehensiveCoefficient * attendanceRate).toFixed(2));
+    const totalSalary = Number((basicSalary + positionSalary + performanceSalary + otherPay).toFixed(2));
     const timestamp = getCurrentTimestamp();
 
     const result = db.prepare(`
@@ -119,12 +131,27 @@ router.post('/calculate', (req: any, res) => {
         emp_id,
         sampler_id,
         year_month,
-        base_salary,
-        piece_rate_salary,
-        hourly_salary,
-        overtime_pay,
-        performance_bonus,
-        deductions,
+        basic_salary,
+        position_salary,
+        group_revenue,
+        performance_pool,
+        equal_performance,
+        differential_performance,
+        workload_points,
+        group_workload_points,
+        workload_share,
+        attendance_days,
+        required_attendance_days,
+        attendance_rate,
+        quality_score,
+        timeliness_score,
+        equipment_score,
+        comprehensive_score,
+        comprehensive_coefficient,
+        performance_salary,
+        other_pay,
+        veto,
+        veto_reason,
         total_salary,
         actual_salary,
         payment_status,
@@ -133,21 +160,37 @@ router.post('/calculate', (req: any, res) => {
         is_deleted,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', NULL, NULL, 'n', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', NULL, ?, 'n', ?, ?)
     `).run(
       req.user.corp_id,
       req.user.app_id,
       req.user.emp_id,
       samplerId,
       yearMonth,
-      baseSalary,
-      pieceRateSalary,
-      hourlySalary,
-      overtimePay,
-      performanceBonus,
-      deductions,
+      basicSalary,
+      positionSalary,
+      groupRevenue,
+      performancePool,
+      equalPerformance,
+      differentialPerformance,
+      workloadPoints,
+      groupWorkloadPoints,
+      workloadShare,
+      attendanceDays,
+      requiredAttendanceDays,
+      attendanceRate,
+      qualityScore,
+      timelinessScore,
+      equipmentScore,
+      comprehensiveScore,
+      comprehensiveCoefficient,
+      performanceSalary,
+      otherPay,
+      veto ? 1 : 0,
+      req.body.veto_reason || null,
       totalSalary,
       totalSalary,
+      req.body.notes || null,
       timestamp,
       timestamp,
     );
@@ -183,12 +226,10 @@ router.put('/:id', (req: any, res) => {
     db.prepare(`
       UPDATE salary_records
       SET
-        base_salary = ?,
-        piece_rate_salary = ?,
-        hourly_salary = ?,
-        overtime_pay = ?,
-        performance_bonus = ?,
-        deductions = ?,
+        basic_salary = ?,
+        position_salary = ?,
+        performance_salary = ?,
+        other_pay = ?,
         total_salary = ?,
         actual_salary = ?,
         payment_status = ?,
@@ -197,12 +238,10 @@ router.put('/:id', (req: any, res) => {
         updated_at = ?
       WHERE id = ? AND corp_id = ?
     `).run(
-      req.body.base_salary ?? existing.base_salary,
-      req.body.piece_rate_salary ?? existing.piece_rate_salary,
-      req.body.hourly_salary ?? existing.hourly_salary,
-      req.body.overtime_pay ?? existing.overtime_pay,
-      req.body.performance_bonus ?? existing.performance_bonus,
-      req.body.deductions ?? existing.deductions,
+      req.body.basic_salary ?? existing.basic_salary,
+      req.body.position_salary ?? existing.position_salary,
+      req.body.performance_salary ?? existing.performance_salary,
+      req.body.other_pay ?? existing.other_pay,
       req.body.total_salary ?? existing.total_salary,
       req.body.actual_salary ?? existing.actual_salary,
       req.body.payment_status ?? existing.payment_status,

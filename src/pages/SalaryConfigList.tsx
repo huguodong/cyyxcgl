@@ -69,14 +69,16 @@ export function SalaryConfigList() {
 
   const getConfigDisplay = (key: string) => {
     const displays: Record<string, { title: string; desc: string; unit: string }> = {
-      piece_rate_base: { title: '计件基础单价', desc: '每个样本的基础计件工资', unit: '元' },
-      hourly_rate: { title: '工时工资单价', desc: '正常工时的每小时工资', unit: '元/小时' },
-      overtime_multiplier: { title: '加班系数', desc: '工作日加班工资的倍数', unit: '倍' },
-      weekend_multiplier: { title: '周末系数', desc: '周末加班工资的倍数', unit: '倍' },
-      holiday_multiplier: { title: '节假日系数', desc: '法定节假日加班工资的倍数', unit: '倍' },
-      performance_ratio: { title: '绩效比例', desc: '绩效奖金占基础工资的比例', unit: '%' },
-      tax_rate: { title: '税率', desc: '个人所得税税率', unit: '%' },
-      social_security_ratio: { title: '社保比例', desc: '个人社保缴纳比例', unit: '%' },
+      basic_salary_standard: { title: '基本工资标准', desc: '制度默认基本工资；低于当地最低工资时按最低工资执行', unit: '元/月' },
+      local_minimum_wage: { title: '当地最低工资', desc: '适用地现行最低工资标准', unit: '元/月' },
+      performance_pool_ratio: { title: '绩效池提取比例', desc: '小组有效业绩提取为绩效工资池的比例', unit: '%' },
+      equal_share_ratio: { title: '均分绩效比例', desc: '绩效工资池中按人数均分的比例', unit: '%' },
+      differential_share_ratio: { title: '差异绩效比例', desc: '绩效工资池中按工作量占比分配的比例', unit: '%' },
+      default_required_attendance_days: { title: '默认应出勤天数', desc: '月度出勤折算率默认分母，可在计算时覆盖', unit: '天' },
+      position_salary_level_1: { title: '一级岗位工资', desc: '能在带教下完成基础采样辅助工作', unit: '元/月' },
+      position_salary_level_2: { title: '二级岗位工资', desc: '能独立完成常规采样任务', unit: '元/月' },
+      position_salary_level_3: { title: '三级岗位工资', desc: '能处理复杂、夜间或应急任务', unit: '元/月' },
+      position_salary_level_4: { title: '四级岗位工资', desc: '能带队作业、协调现场并承担带教责任', unit: '元/月' },
     };
     return displays[key] || { title: key, desc: '', unit: '' };
   };

@@ -50,12 +50,11 @@ router.post('/', (req: any, res) => {
         phone,
         entry_date,
         status,
-        base_salary,
-        skill_level,
+        job_level,
         is_deleted,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'n', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'n', ?, ?)
     `).run(
       req.user.corp_id,
       req.user.app_id,
@@ -65,8 +64,7 @@ router.post('/', (req: any, res) => {
       req.body.phone || null,
       req.body.entry_date || null,
       req.body.status || 'active',
-      Number.parseFloat(req.body.base_salary) || 0,
-      req.body.skill_level || null,
+      Number.parseInt(req.body.job_level, 10) || 1,
       timestamp,
       timestamp,
     );
@@ -100,8 +98,7 @@ router.put('/:id', (req: any, res) => {
         phone = ?,
         entry_date = ?,
         status = ?,
-        base_salary = ?,
-        skill_level = ?,
+        job_level = ?,
         updated_at = ?
       WHERE id = ? AND corp_id = ?
     `).run(
@@ -110,8 +107,7 @@ router.put('/:id', (req: any, res) => {
       req.body.phone ?? existing.phone,
       req.body.entry_date ?? existing.entry_date,
       req.body.status ?? existing.status,
-      req.body.base_salary !== undefined ? Number.parseFloat(req.body.base_salary) || 0 : existing.base_salary,
-      req.body.skill_level ?? existing.skill_level,
+      req.body.job_level !== undefined ? Number.parseInt(req.body.job_level, 10) || 1 : existing.job_level,
       timestamp,
       req.params.id,
       req.user.corp_id,

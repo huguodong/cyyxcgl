@@ -29,8 +29,7 @@ interface Sampler {
   phone: string;
   entry_date: string;
   status: string;
-  base_salary: number;
-  skill_level: string;
+  job_level: number;
 }
 
 export function SamplerList() {
@@ -44,8 +43,7 @@ export function SamplerList() {
     phone: '',
     entry_date: '',
     status: 'active',
-    base_salary: 0,
-    skill_level: '',
+    job_level: 1,
   });
 
   useEffect(() => {
@@ -88,8 +86,7 @@ export function SamplerList() {
       phone: sampler.phone || '',
       entry_date: sampler.entry_date || '',
       status: sampler.status,
-      base_salary: sampler.base_salary,
-      skill_level: sampler.skill_level || '',
+      job_level: sampler.job_level || 1,
     });
     setDialogOpen(true);
   };
@@ -111,8 +108,7 @@ export function SamplerList() {
       phone: '',
       entry_date: '',
       status: 'active',
-      base_salary: 0,
-      skill_level: '',
+      job_level: 1,
     });
   };
 
@@ -131,8 +127,7 @@ export function SamplerList() {
         { key: 'employee_code', label: '工号' },
         { key: 'phone', label: '联系电话' },
         { key: 'entry_date', label: '入职日期' },
-        { key: 'skill_level', label: '技能等级' },
-        { key: 'base_salary', label: '基础工资' },
+        { key: 'job_level', label: '岗位等级' },
         { key: 'status', label: '状态' },
       ]
     );
@@ -198,21 +193,18 @@ export function SamplerList() {
                 />
               </div>
               <div>
-                <Label htmlFor="skill_level">技能等级</Label>
-                <Input
-                  id="skill_level"
-                  value={formData.skill_level}
-                  onChange={(e) => setFormData({ ...formData, skill_level: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="base_salary">基础工资</Label>
-                <Input
-                  id="base_salary"
-                  type="number"
-                  value={formData.base_salary}
-                  onChange={(e) => setFormData({ ...formData, base_salary: parseFloat(e.target.value) || 0 })}
-                />
+                <Label htmlFor="job_level">岗位等级</Label>
+                <select
+                  id="job_level"
+                  value={formData.job_level}
+                  onChange={(e) => setFormData({ ...formData, job_level: parseInt(e.target.value, 10) || 1 })}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2"
+                >
+                  <option value={1}>一级 - 岗位工资 200 元/月</option>
+                  <option value={2}>二级 - 岗位工资 400 元/月</option>
+                  <option value={3}>三级 - 岗位工资 800 元/月</option>
+                  <option value={4}>四级 - 岗位工资 1600 元/月</option>
+                </select>
               </div>
               <div>
                 <Label htmlFor="status">状态</Label>
@@ -247,8 +239,7 @@ export function SamplerList() {
               <TableHead>工号</TableHead>
               <TableHead>联系电话</TableHead>
               <TableHead>入职日期</TableHead>
-              <TableHead>技能等级</TableHead>
-              <TableHead>基础工资</TableHead>
+              <TableHead>岗位等级</TableHead>
               <TableHead>状态</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
@@ -260,8 +251,7 @@ export function SamplerList() {
                 <TableCell>{sampler.employee_code}</TableCell>
                 <TableCell>{sampler.phone}</TableCell>
                 <TableCell>{sampler.entry_date}</TableCell>
-                <TableCell>{sampler.skill_level}</TableCell>
-                <TableCell>¥{sampler.base_salary?.toFixed(2)}</TableCell>
+                <TableCell>{sampler.job_level || 1}级</TableCell>
                 <TableCell>
                   <Badge variant={sampler.status === 'active' ? 'default' : 'secondary'}>
                     {sampler.status === 'active' ? '在职' : sampler.status === 'leave' ? '休假' : '离职'}
