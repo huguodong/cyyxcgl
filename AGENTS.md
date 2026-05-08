@@ -14,6 +14,8 @@
 2. 当前认证为 **本地账号 + Cookie Session**，不是 Supabase Auth。
 3. API 统一在 `/api/*` 下，鉴权中间件在 `server/_core/auth.ts`。
 4. 后端运行入口为 `dist/server/index.js`，构建由根目录脚本驱动。
+5. Docker 部署以根目录 `Dockerfile` + `compose.yaml` 为准，默认形态为 **单容器 + 单 SQLite 持久化卷**。
+6. 使用 Docker 时，容器内数据库路径固定为 `/app/data/sampler-salary.sqlite`，禁止多副本共享写同一个 SQLite 文件。
 
 ## 3. 执行原则
 

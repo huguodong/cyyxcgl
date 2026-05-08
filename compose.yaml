@@ -1,0 +1,27 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: beichen-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3002}:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      DATABASE_PATH: /app/data/sampler-salary.sqlite
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-session-secret}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SESSION_MAX_AGE_MS: ${SESSION_MAX_AGE_MS:-604800000}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-sampler_salary_session}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123456}
+      ADMIN_NAME: ${ADMIN_NAME:-系统管理员}
+      APP_ID: ${APP_ID:-internal-app}
+      CORP_ID: ${CORP_ID:-internal}
+    volumes:
+      - beichen_data:/app/data
+
+volumes:
+  beichen_data:

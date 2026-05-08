@@ -103,6 +103,92 @@ npm run start
 | `APP_ID` | `internal-app` | 应用标识 |
 | `CORP_ID` | `internal` | 企业标识 |
 
+## Ubuntu + Docker Compose 部署
+
+适合当前项目的推荐容器形态是：**单个 Node.js 应用容器 + 单个 SQLite 持久化卷**。
+
+- 前端构建产物仍由 Express 提供静态服务
+- API 与页面同域运行
+- SQLite 数据持久化在 Docker volume 中
+- 当前方案默认 **不依赖 Nginx**，直接暴露 `3002` 端口
+
+### 1) 服务器准备
+
+确保 Ubuntu 服务器已安装 Docker Engine 与 Docker Compose 插件。
+
+### 2) 配置环境变量
+
+首次部署前复制环境变量模板：
+
+```bash
+cp .env.example .env
+```
+
+至少修改以下值：
+
+- `SESSION_SECRET`
+- `ADMIN_PASSWORD`
+
+如果你已经通过域名 + HTTPS 对外提供服务，再将：
+
+```bash
+SESSION_COOKIE_SECURE=true
+```
+
+### 3) 启动服务
+
+可以直接使用仓库内脚本：
+
+```bash
+bash scripts/docker-deploy.sh
+```
+
+或手动执行：
+
+```bash
+docker compose up -d --build
+```
+
+默认访问地址：
+
+```text
+http://服务器IP:3002
+```
+
+### 4) 常用运维命令
+
+查看日志：
+
+```bash
+docker compose logs -f app
+```
+
+停止服务：
+
+```bash
+bash scripts/docker-down.sh
+```
+
+或：
+
+```bash
+docker compose down
+```
+
+### 5) 数据说明
+
+- 容器内数据库路径固定为 `/app/data/sampler-salary.sqlite`
+- `compose.yaml` 默认使用名为 `beichen_data` 的 Docker volume 持久化数据
+- 该项目当前数据库为 SQLite，**只建议单实例运行**
+
+### 6) 更新部署
+
+服务器拉取新代码后重新执行：
+
+```bash
+docker compose up -d --build
+```
+
 ## Windows + PM2 部署
 
 项目已提供打包脚本：
@@ -141,3 +227,4 @@ npm run preview      # 预览前端构建结果
 - 数据库结构初始化逻辑在 `server/lib/db.ts`
 - API 路由入口在 `server/index.ts`
 - 若你正在从旧版 Supabase 方案迁移，请以当前代码实现（SQLite + 本地登录）为准
+- 若使用 Docker 部署，请保持单容器/单实例写入 SQLite，不要把同一个数据库文件挂给多个副本同时写入
