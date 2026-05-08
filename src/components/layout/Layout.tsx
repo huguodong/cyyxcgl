@@ -2,8 +2,6 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
-  ClipboardList, 
-  Clock, 
   Banknote,
   Settings,
   Building2,
@@ -16,8 +14,6 @@ import { useAuth } from '@/components/auth/AuthProvider';
 const navigation = [
   { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard },
   { name: '采样员管理', href: '/samplers', icon: Users },
-  { name: '采样任务', href: '/tasks', icon: ClipboardList },
-  { name: '工时记录', href: '/work-hours', icon: Clock },
   { name: '薪酬管理', href: '/salaries', icon: Banknote },
   { name: '薪酬配置', href: '/salary-configs', icon: Settings },
 ];

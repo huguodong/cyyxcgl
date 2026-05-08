@@ -8,8 +8,6 @@ import { need_login } from './_core/auth.js';
 import { initDatabase } from './lib/db.js';
 import authRoutes from './routes/auth.js';
 import samplersRoutes from './routes/samplers.js';
-import tasksRoutes from './routes/tasks.js';
-import workHoursRoutes from './routes/workHours.js';
 import salariesRoutes from './routes/salaries.js';
 import salaryConfigsRoutes from './routes/salaryConfigs.js';
 
@@ -32,8 +30,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api', need_login);
 
 app.use('/api/samplers', samplersRoutes);
-app.use('/api/tasks', tasksRoutes);
-app.use('/api/work-hours', workHoursRoutes);
 app.use('/api/salaries', salariesRoutes);
 app.use('/api/salary-configs', salaryConfigsRoutes);
 

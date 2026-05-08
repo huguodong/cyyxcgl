@@ -158,6 +158,9 @@ export function initDatabase() {
   db.pragma('foreign_keys = ON');
 
   db.exec(`
+    DROP TABLE IF EXISTS sampling_tasks;
+    DROP TABLE IF EXISTS work_hours;
+
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT NOT NULL UNIQUE,
@@ -187,47 +190,6 @@ export function initDatabase() {
       updated_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS sampling_tasks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      corp_id TEXT NOT NULL,
-      app_id TEXT NOT NULL,
-      emp_id TEXT NOT NULL,
-      task_code TEXT,
-      task_type TEXT NOT NULL,
-      location TEXT,
-      sampler_id INTEGER,
-      start_time TEXT,
-      end_time TEXT,
-      status TEXT NOT NULL DEFAULT 'pending',
-      sample_count INTEGER NOT NULL DEFAULT 0,
-      difficulty_level REAL NOT NULL DEFAULT 1,
-      is_deleted TEXT NOT NULL DEFAULT 'n',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY (sampler_id) REFERENCES samplers(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS work_hours (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      corp_id TEXT NOT NULL,
-      app_id TEXT NOT NULL,
-      emp_id TEXT NOT NULL,
-      sampler_id INTEGER,
-      work_date TEXT NOT NULL,
-      regular_hours REAL NOT NULL DEFAULT 0,
-      overtime_hours REAL NOT NULL DEFAULT 0,
-      weekend_hours REAL NOT NULL DEFAULT 0,
-      holiday_hours REAL NOT NULL DEFAULT 0,
-      total_hours REAL NOT NULL DEFAULT 0,
-      is_approved INTEGER NOT NULL DEFAULT 0,
-      approved_by TEXT,
-      approved_at TEXT,
-      is_deleted TEXT NOT NULL DEFAULT 'n',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY (sampler_id) REFERENCES samplers(id)
-    );
-
     CREATE TABLE IF NOT EXISTS salary_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       corp_id TEXT NOT NULL,
@@ -238,6 +200,7 @@ export function initDatabase() {
       basic_salary REAL NOT NULL DEFAULT 0,
       position_salary REAL NOT NULL DEFAULT 0,
       group_revenue REAL NOT NULL DEFAULT 0,
+      distribution_count INTEGER NOT NULL DEFAULT 4,
       performance_pool REAL NOT NULL DEFAULT 0,
       equal_performance REAL NOT NULL DEFAULT 0,
       differential_performance REAL NOT NULL DEFAULT 0,
@@ -248,8 +211,39 @@ export function initDatabase() {
       required_attendance_days REAL NOT NULL DEFAULT 0,
       attendance_rate REAL NOT NULL DEFAULT 1,
       quality_score REAL NOT NULL DEFAULT 100,
+      internal_complaints INTEGER NOT NULL DEFAULT 0,
+      internal_complaint_score REAL NOT NULL DEFAULT 15,
+      external_complaints INTEGER NOT NULL DEFAULT 0,
+      external_complaint_score REAL NOT NULL DEFAULT 25,
+      record_required_key_items INTEGER NOT NULL DEFAULT 4,
+      record_required_general_items INTEGER NOT NULL DEFAULT 6,
+      record_missing_key_items INTEGER NOT NULL DEFAULT 0,
+      record_missing_general_items INTEGER NOT NULL DEFAULT 0,
+      record_completeness_rate REAL NOT NULL DEFAULT 100,
+      record_completeness_score REAL NOT NULL DEFAULT 30,
+      record_accuracy_key_items INTEGER NOT NULL DEFAULT 4,
+      record_accuracy_general_items INTEGER NOT NULL DEFAULT 4,
+      record_error_key_items INTEGER NOT NULL DEFAULT 0,
+      record_error_general_items INTEGER NOT NULL DEFAULT 0,
+      record_accuracy_rate REAL NOT NULL DEFAULT 100,
+      record_accuracy_score REAL NOT NULL DEFAULT 30,
       timeliness_score REAL NOT NULL DEFAULT 100,
+      punctual_required_count INTEGER NOT NULL DEFAULT 0,
+      late_count INTEGER NOT NULL DEFAULT 0,
+      punctuality_rate REAL NOT NULL DEFAULT 100,
+      punctuality_score REAL NOT NULL DEFAULT 50,
+      handover_required_count INTEGER NOT NULL DEFAULT 0,
+      overdue_count INTEGER NOT NULL DEFAULT 0,
+      handover_timeliness_rate REAL NOT NULL DEFAULT 100,
+      handover_timeliness_score REAL NOT NULL DEFAULT 50,
       equipment_score REAL NOT NULL DEFAULT 100,
+      maintenance_check_count INTEGER NOT NULL DEFAULT 0,
+      maintenance_fail_count INTEGER NOT NULL DEFAULT 0,
+      maintenance_score REAL NOT NULL DEFAULT 60,
+      consumable_usage_count INTEGER NOT NULL DEFAULT 0,
+      consumable_waste_count INTEGER NOT NULL DEFAULT 0,
+      consumable_waste_rate REAL NOT NULL DEFAULT 0,
+      consumable_waste_score REAL NOT NULL DEFAULT 40,
       comprehensive_score REAL NOT NULL DEFAULT 100,
       comprehensive_coefficient REAL NOT NULL DEFAULT 1,
       performance_salary REAL NOT NULL DEFAULT 0,
@@ -288,6 +282,7 @@ export function initDatabase() {
   ensureColumn('salary_records', 'basic_salary', 'REAL NOT NULL DEFAULT 0');
   ensureColumn('salary_records', 'position_salary', 'REAL NOT NULL DEFAULT 0');
   ensureColumn('salary_records', 'group_revenue', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'distribution_count', 'INTEGER NOT NULL DEFAULT 4');
   ensureColumn('salary_records', 'performance_pool', 'REAL NOT NULL DEFAULT 0');
   ensureColumn('salary_records', 'equal_performance', 'REAL NOT NULL DEFAULT 0');
   ensureColumn('salary_records', 'differential_performance', 'REAL NOT NULL DEFAULT 0');
@@ -298,8 +293,39 @@ export function initDatabase() {
   ensureColumn('salary_records', 'required_attendance_days', 'REAL NOT NULL DEFAULT 0');
   ensureColumn('salary_records', 'attendance_rate', 'REAL NOT NULL DEFAULT 1');
   ensureColumn('salary_records', 'quality_score', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'internal_complaints', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'internal_complaint_score', 'REAL NOT NULL DEFAULT 15');
+  ensureColumn('salary_records', 'external_complaints', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'external_complaint_score', 'REAL NOT NULL DEFAULT 25');
+  ensureColumn('salary_records', 'record_required_key_items', 'INTEGER NOT NULL DEFAULT 4');
+  ensureColumn('salary_records', 'record_required_general_items', 'INTEGER NOT NULL DEFAULT 6');
+  ensureColumn('salary_records', 'record_missing_key_items', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'record_missing_general_items', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'record_completeness_rate', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'record_completeness_score', 'REAL NOT NULL DEFAULT 30');
+  ensureColumn('salary_records', 'record_accuracy_key_items', 'INTEGER NOT NULL DEFAULT 4');
+  ensureColumn('salary_records', 'record_accuracy_general_items', 'INTEGER NOT NULL DEFAULT 4');
+  ensureColumn('salary_records', 'record_error_key_items', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'record_error_general_items', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'record_accuracy_rate', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'record_accuracy_score', 'REAL NOT NULL DEFAULT 30');
   ensureColumn('salary_records', 'timeliness_score', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'punctual_required_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'late_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'punctuality_rate', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'punctuality_score', 'REAL NOT NULL DEFAULT 50');
+  ensureColumn('salary_records', 'handover_required_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'overdue_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'handover_timeliness_rate', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'handover_timeliness_score', 'REAL NOT NULL DEFAULT 50');
   ensureColumn('salary_records', 'equipment_score', 'REAL NOT NULL DEFAULT 100');
+  ensureColumn('salary_records', 'maintenance_check_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'maintenance_fail_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'maintenance_score', 'REAL NOT NULL DEFAULT 60');
+  ensureColumn('salary_records', 'consumable_usage_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'consumable_waste_count', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'consumable_waste_rate', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn('salary_records', 'consumable_waste_score', 'REAL NOT NULL DEFAULT 40');
   ensureColumn('salary_records', 'comprehensive_score', 'REAL NOT NULL DEFAULT 100');
   ensureColumn('salary_records', 'comprehensive_coefficient', 'REAL NOT NULL DEFAULT 1');
   ensureColumn('salary_records', 'performance_salary', 'REAL NOT NULL DEFAULT 0');

@@ -1,87 +1,77 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, ClipboardList, Clock, Banknote } from 'lucide-react';
+import { Users, Banknote, TrendingUp, ShieldCheck } from 'lucide-react';
 import { api } from '@/services/api';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { ChartContainer } from '@/components/ui/chart';
+import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 
-interface TaskTypeDist {
-  name: string;
-  value: number;
+interface SalaryRecord {
+  year_month: string;
+  total_salary: number;
+  performance_salary: number;
+  comprehensive_score: number;
+  veto: number;
 }
 
-interface WorkHourTrend {
-  date: string;
-  hours: number;
-}
-
-interface SalaryDist {
+interface SalaryTrend {
   month: string;
   totalSalary: number;
-  baseSalary: number;
-  pieceRateSalary: number;
-  overtimePay: number;
+  performanceSalary: number;
+}
+
+interface ScoreTrend {
+  month: string;
+  comprehensiveScore: number;
 }
 
 export function Dashboard() {
   const [stats, setStats] = useState({
     samplers: 0,
-    tasks: 0,
-    workHours: 0,
     salaries: 0,
+    totalSalary: 0,
+    vetoCount: 0,
   });
-  const [taskTypeDist, setTaskTypeDist] = useState<TaskTypeDist[]>([]);
-  const [workHourTrend, setWorkHourTrend] = useState<WorkHourTrend[]>([]);
-  const [salaryDist, setSalaryDist] = useState<SalaryDist[]>([]);
+  const [salaryTrend, setSalaryTrend] = useState<SalaryTrend[]>([]);
+  const [scoreTrend, setScoreTrend] = useState<ScoreTrend[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       api.samplers.list(),
-      api.tasks.list(),
-      api.workHours.list(),
       api.salaries.list(),
-    ]).then(([samplers, tasks, workHours, salaries]) => {
+    ]).then(([samplers, salaries]) => {
+      const salaryRows = (salaries || []) as SalaryRecord[];
+
       setStats({
         samplers: samplers?.length || 0,
-        tasks: tasks?.length || 0,
-        workHours: workHours?.length || 0,
-        salaries: salaries?.length || 0,
+        salaries: salaryRows.length,
+        totalSalary: salaryRows.reduce((sum, row) => sum + (row.total_salary || 0), 0),
+        vetoCount: salaryRows.filter((row) => row.veto).length,
       });
 
-      // 任务类型分布
-      const typeCount: Record<string, number> = {};
-      tasks?.forEach((task: any) => {
-        typeCount[task.task_type || '未知'] = (typeCount[task.task_type || '未知'] || 0) + 1;
-      });
-      setTaskTypeDist(Object.entries(typeCount).map(([name, value]) => ({ name, value })));
-
-      // 工时趋势（最近 7 天）
-      const hourByDate: Record<string, number> = {};
-      workHours?.forEach((wh: any) => {
-        const date = wh.work_date ? new Date(wh.work_date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : '未知';
-        hourByDate[date] = (hourByDate[date] || 0) + (wh.total_hours || 0);
-      });
-      const sortedDates = Object.keys(hourByDate).sort().slice(-7);
-      setWorkHourTrend(sortedDates.map(date => ({ date, hours: hourByDate[date] })));
-
-      // 薪酬分布（最近 6 个月）
-      const salaryByMonth: Record<string, any> = {};
-      salaries?.forEach((s: any) => {
-        const month = s.year_month || '未知';
-        if (!salaryByMonth[month]) {
-          salaryByMonth[month] = { month, totalSalary: 0, baseSalary: 0, pieceRateSalary: 0, overtimePay: 0 };
+      const byMonth: Record<string, { month: string; totalSalary: number; performanceSalary: number; scoreSum: number; count: number }> = {};
+      salaryRows.forEach((row) => {
+        const month = row.year_month || '未填月份';
+        if (!byMonth[month]) {
+          byMonth[month] = { month, totalSalary: 0, performanceSalary: 0, scoreSum: 0, count: 0 };
         }
-        salaryByMonth[month].totalSalary += s.total_salary || 0;
-        salaryByMonth[month].baseSalary += s.base_salary || 0;
-        salaryByMonth[month].pieceRateSalary += s.piece_rate_salary || 0;
-        salaryByMonth[month].overtimePay += s.overtime_pay || 0;
+        byMonth[month].totalSalary += row.total_salary || 0;
+        byMonth[month].performanceSalary += row.performance_salary || 0;
+        byMonth[month].scoreSum += row.comprehensive_score || 0;
+        byMonth[month].count += 1;
       });
-      const sortedMonths = Object.keys(salaryByMonth).sort().slice(-6);
-      setSalaryDist(sortedMonths.map(m => salaryByMonth[m]));
 
-      setLoading(false);
-    }).catch(() => {
+      const months = Object.keys(byMonth).sort().slice(-6);
+      setSalaryTrend(months.map((month) => ({
+        month,
+        totalSalary: Number(byMonth[month].totalSalary.toFixed(2)),
+        performanceSalary: Number(byMonth[month].performanceSalary.toFixed(2)),
+      })));
+      setScoreTrend(months.map((month) => ({
+        month,
+        comprehensiveScore: Number((byMonth[month].scoreSum / Math.max(byMonth[month].count, 1)).toFixed(2)),
+      })));
+    }).finally(() => {
       setLoading(false);
     });
   }, []);
@@ -91,18 +81,19 @@ export function Dashboard() {
   }
 
   const statCards = [
-    { title: '采样员总数', value: stats.samplers, icon: Users, color: 'text-blue-600' },
-    { title: '采样任务数', value: stats.tasks, icon: ClipboardList, color: 'text-green-600' },
-    { title: '工时记录数', value: stats.workHours, icon: Clock, color: 'text-orange-600' },
-    { title: '薪酬记录数', value: stats.salaries, icon: Banknote, color: 'text-purple-600' },
+    { title: '采样岗位人数', value: stats.samplers, icon: Users, color: 'text-blue-600' },
+    { title: '月度薪酬记录', value: stats.salaries, icon: Banknote, color: 'text-green-600' },
+    { title: '应发工资合计', value: `¥${stats.totalSalary.toFixed(2)}`, icon: TrendingUp, color: 'text-purple-600' },
+    { title: '一票否决记录', value: stats.vetoCount, icon: ShieldCheck, color: 'text-red-600' },
   ];
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">仪表盘</h1>
-      
+      <div>
+        <h1 className="text-3xl font-bold">仪表盘</h1>
+        <p className="text-muted-foreground mt-1">按 V3 制度统计采样岗位、月度工资和综合考评结果。</p>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title}>
@@ -117,95 +108,48 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>任务类型分布</CardTitle>
+            <CardTitle>薪酬趋势（最近 6 个月）</CardTitle>
           </CardHeader>
           <CardContent>
-            {taskTypeDist.length > 0 ? (
+            {salaryTrend.length > 0 ? (
               <ChartContainer config={{}} className="h-[300px]">
-                <PieChart>
-                  <Pie
-                    data={taskTypeDist}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {taskTypeDist.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
+                <LineChart data={salaryTrend}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Line type="monotone" dataKey="totalSalary" stroke="#2563eb" name="应发工资" />
+                  <Line type="monotone" dataKey="performanceSalary" stroke="#16a34a" name="绩效工资" />
+                </LineChart>
               </ChartContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">暂无数据</div>
+              <div className="text-center py-12 text-muted-foreground">暂无薪酬记录</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>工时趋势（最近 7 天）</CardTitle>
+            <CardTitle>综合得分均值（最近 6 个月）</CardTitle>
           </CardHeader>
           <CardContent>
-            {workHourTrend.length > 0 ? (
+            {scoreTrend.length > 0 ? (
               <ChartContainer config={{}} className="h-[300px]">
-                <BarChart data={workHourTrend}>
+                <BarChart data={scoreTrend}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="hours" fill="#3b82f6" />
+                  <XAxis dataKey="month" />
+                  <YAxis domain={[0, 100]} />
+                  <Bar dataKey="comprehensiveScore" fill="#0f766e" name="综合得分" />
                 </BarChart>
               </ChartContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">暂无数据</div>
+              <div className="text-center py-12 text-muted-foreground">暂无考评记录</div>
             )}
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>薪酬构成趋势（最近 6 个月）</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {salaryDist.length > 0 ? (
-            <ChartContainer config={{}} className="h-[300px]">
-              <LineChart data={salaryDist}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Line type="monotone" dataKey="totalSalary" stroke="#8884d8" name="总薪酬" />
-                <Line type="monotone" dataKey="baseSalary" stroke="#82ca9d" name="基础工资" />
-                <Line type="monotone" dataKey="pieceRateSalary" stroke="#ffc658" name="计件工资" />
-                <Line type="monotone" dataKey="overtimePay" stroke="#ff8042" name="加班工资" />
-              </LineChart>
-            </ChartContainer>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">暂无数据</div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>欢迎使用采样员薪酬管理系统</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            本系统提供采样员信息管理、采样任务分配、工时记录和薪酬核算等功能。
-            请使用左侧导航栏访问各个功能模块。
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }

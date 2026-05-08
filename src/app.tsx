@@ -6,8 +6,6 @@ import { Login } from './pages/Login';
 import { SamplerList } from './pages/SamplerList';
 import { SalaryConfigList } from './pages/SalaryConfigList';
 import { SalaryList } from './pages/SalaryList';
-import { TaskList } from './pages/TaskList';
-import { WorkHoursList } from './pages/WorkHoursList';
 
 function ProtectedLayout() {
   const { loading, user } = useAuth();
@@ -31,8 +29,6 @@ function AppRoutes() {
         <Route element={<Navigate replace to="/dashboard" />} index />
         <Route element={<Dashboard />} path="dashboard" />
         <Route element={<SamplerList />} path="samplers" />
-        <Route element={<TaskList />} path="tasks" />
-        <Route element={<WorkHoursList />} path="work-hours" />
         <Route element={<SalaryList />} path="salaries" />
         <Route element={<SalaryConfigList />} path="salary-configs" />
         <Route element={<Navigate replace to="/dashboard" />} path="*" />

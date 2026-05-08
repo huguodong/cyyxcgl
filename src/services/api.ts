@@ -60,22 +60,6 @@ export const api = {
     update: (id: number, data: any) => apiFetch<any>(`/api/samplers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) => apiFetch<void>(`/api/samplers/${id}`, { method: 'DELETE' }),
   },
-  tasks: {
-    list: () => apiFetch<any[]>('/api/tasks'),
-    get: (id: number) => apiFetch<any>(`/api/tasks/${id}`),
-    create: (data: any) => apiFetch<any>('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => apiFetch<any>(`/api/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id: number) => apiFetch<void>(`/api/tasks/${id}`, { method: 'DELETE' }),
-    complete: (id: number) => apiFetch<any>(`/api/tasks/${id}/complete`, { method: 'POST' }),
-  },
-  workHours: {
-    list: () => apiFetch<any[]>('/api/work-hours'),
-    get: (id: number) => apiFetch<any>(`/api/work-hours/${id}`),
-    create: (data: any) => apiFetch<any>('/api/work-hours', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: any) => apiFetch<any>(`/api/work-hours/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    delete: (id: number) => apiFetch<void>(`/api/work-hours/${id}`, { method: 'DELETE' }),
-    approve: (id: number) => apiFetch<any>(`/api/work-hours/${id}/approve`, { method: 'POST' }),
-  },
   salaries: {
     list: () => apiFetch<any[]>('/api/salaries'),
     get: (id: number) => apiFetch<any>(`/api/salaries/${id}`),

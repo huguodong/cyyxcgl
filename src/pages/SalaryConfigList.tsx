@@ -10,11 +10,23 @@ import { toast } from 'sonner';
 
 interface SalaryConfig {
   id: number;
-  config_name: string;
   config_key: string;
   config_value: number;
   description: string;
 }
+
+const configDisplays: Record<string, { title: string; desc: string; unit: string }> = {
+  basic_salary_standard: { title: '基本工资标准', desc: '制度默认基本工资；低于当地最低工资时按最低工资执行', unit: '元/月' },
+  local_minimum_wage: { title: '当地最低工资', desc: '适用地现行最低工资标准', unit: '元/月' },
+  performance_pool_ratio: { title: '绩效池提取比例', desc: '小组有效业绩提取为绩效工资池的比例', unit: '%' },
+  equal_share_ratio: { title: '均分绩效比例', desc: '绩效工资池中按人数均分的比例', unit: '%' },
+  differential_share_ratio: { title: '差异绩效比例', desc: '绩效工资池中按工作量占比分配的比例', unit: '%' },
+  default_required_attendance_days: { title: '默认应出勤天数', desc: '月度出勤折算率默认分母，可在核算时覆盖', unit: '天' },
+  position_salary_level_1: { title: '一级岗位工资', desc: '能在带教下完成基础采样辅助工作和简单记录填写', unit: '元/月' },
+  position_salary_level_2: { title: '二级岗位工资', desc: '能独立完成常规采样任务并按要求交接记录和样品', unit: '元/月' },
+  position_salary_level_3: { title: '三级岗位工资', desc: '能处理复杂现场、夜间任务、应急任务并保证质量及时效', unit: '元/月' },
+  position_salary_level_4: { title: '四级岗位工资', desc: '能带队作业、协调现场、解决异常并承担骨干带教责任', unit: '元/月' },
+};
 
 export function SalaryConfigList() {
   const [configs, setConfigs] = useState<SalaryConfig[]>([]);
@@ -32,7 +44,7 @@ export function SalaryConfigList() {
   const loadConfigs = async () => {
     try {
       const data = await api.salaryConfigs.list();
-      setConfigs(data || []);
+      setConfigs((data || []).filter((config) => configDisplays[config.config_key]));
     } catch (error) {
       console.error('Failed to load configs:', error);
     } finally {
@@ -58,7 +70,7 @@ export function SalaryConfigList() {
       setDialogOpen(false);
       setEditingConfig(null);
       loadConfigs();
-    } catch (error) {
+    } catch {
       toast.error('更新失败');
     }
   };
@@ -67,32 +79,16 @@ export function SalaryConfigList() {
     return <div className="text-center py-12">加载中...</div>;
   }
 
-  const getConfigDisplay = (key: string) => {
-    const displays: Record<string, { title: string; desc: string; unit: string }> = {
-      basic_salary_standard: { title: '基本工资标准', desc: '制度默认基本工资；低于当地最低工资时按最低工资执行', unit: '元/月' },
-      local_minimum_wage: { title: '当地最低工资', desc: '适用地现行最低工资标准', unit: '元/月' },
-      performance_pool_ratio: { title: '绩效池提取比例', desc: '小组有效业绩提取为绩效工资池的比例', unit: '%' },
-      equal_share_ratio: { title: '均分绩效比例', desc: '绩效工资池中按人数均分的比例', unit: '%' },
-      differential_share_ratio: { title: '差异绩效比例', desc: '绩效工资池中按工作量占比分配的比例', unit: '%' },
-      default_required_attendance_days: { title: '默认应出勤天数', desc: '月度出勤折算率默认分母，可在计算时覆盖', unit: '天' },
-      position_salary_level_1: { title: '一级岗位工资', desc: '能在带教下完成基础采样辅助工作', unit: '元/月' },
-      position_salary_level_2: { title: '二级岗位工资', desc: '能独立完成常规采样任务', unit: '元/月' },
-      position_salary_level_3: { title: '三级岗位工资', desc: '能处理复杂、夜间或应急任务', unit: '元/月' },
-      position_salary_level_4: { title: '四级岗位工资', desc: '能带队作业、协调现场并承担带教责任', unit: '元/月' },
-    };
-    return displays[key] || { title: key, desc: '', unit: '' };
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">薪酬配置管理</h1>
-        <p className="text-muted-foreground">配置薪酬计算的各项参数</p>
+      <div>
+        <h1 className="text-3xl font-bold">薪酬配置</h1>
+        <p className="text-muted-foreground mt-1">仅保留 V3 制度中的基本工资、岗位工资、绩效池和出勤参数。</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {configs.map((config) => {
-          const display = getConfigDisplay(config.config_key);
+          const display = configDisplays[config.config_key];
           return (
             <Card key={config.id}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -110,7 +106,7 @@ export function SalaryConfigList() {
                   <span className="text-sm text-muted-foreground ml-1">{display.unit}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  键名：{config.config_key}
+                  参数：{config.config_key}
                 </p>
               </CardContent>
             </Card>
@@ -125,9 +121,9 @@ export function SalaryConfigList() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label>{editingConfig ? getConfigDisplay(editingConfig.config_key).title : '配置项'}</Label>
+              <Label>{editingConfig ? configDisplays[editingConfig.config_key].title : '配置项'}</Label>
               <p className="text-sm text-muted-foreground mb-2">
-                {editingConfig ? getConfigDisplay(editingConfig.config_key).desc : ''}
+                {editingConfig ? configDisplays[editingConfig.config_key].desc : ''}
               </p>
             </div>
             <div>
